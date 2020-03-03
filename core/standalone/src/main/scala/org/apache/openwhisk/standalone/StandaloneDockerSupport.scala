@@ -126,6 +126,13 @@ object StandaloneDockerSupport {
       else "localhost")
   }
 
+  def getRemoteHostName(): String = {
+    sys.props
+      .get("whisk.standalone.remote.host")
+      .getOrElse(if (SystemUtils.IS_OS_LINUX) hostIpLinux
+      else "localhost")
+  }
+
   def getLocalHostIp(): String = {
     sys.props
       .get("whisk.standalone.host.ip")

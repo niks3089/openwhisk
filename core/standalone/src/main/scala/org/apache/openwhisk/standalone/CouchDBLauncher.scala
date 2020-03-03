@@ -55,7 +55,7 @@ class CouchDBLauncher(docker: StandaloneDockerClient, port: Int, dataDir: File)(
                            whiskViews: List[String],
                            activationViews: List[String])
   private val dbConfig = loadConfigOrThrow[CouchDBConfig](StandaloneConfigKeys.couchDBConfigKey)
-  private val couchClient = new PoolingRestClient("http", StandaloneDockerSupport.getLocalHostName(), port, 100)
+  private val couchClient = new PoolingRestClient("http", StandaloneDockerSupport.getRemoteHostName(), port, 100)
   private val baseHeaders: List[HttpHeader] =
     List(Authorization(BasicHttpCredentials(dbConfig.user, dbConfig.password)), Accept(MediaTypes.`application/json`))
   private val subjectDb = dbConfig.prefix + "subjects"
@@ -81,7 +81,7 @@ class CouchDBLauncher(docker: StandaloneDockerClient, port: Int, dataDir: File)(
         logging.info(
           this,
           s"CouchDB started successfully at http://${StandaloneDockerSupport
-            .getLocalHostName()}:$port/_utils . Username: [${dbConfig.user}], Password: [${dbConfig.password}]")
+            .getRemoteHostName()}:$port/_utils . Username: [${dbConfig.user}], Password: [${dbConfig.password}]")
         Future.successful(Done)
       }
     } yield dbSvcs
@@ -105,7 +105,7 @@ class CouchDBLauncher(docker: StandaloneDockerClient, port: Int, dataDir: File)(
   }
 
   def waitForCouchDB(): Future[Done] = {
-    new ServerStartupCheck(Uri(s"http://${StandaloneDockerSupport.getLocalHostName()}:$port/_utils/"), "CouchDB")
+    new ServerStartupCheck(Uri(s"http://${StandaloneDockerSupport.getRemoteHostName()}:$port/_utils/"), "CouchDB")
       .waitForServerToStart()
     Future.successful(Done)
   }
@@ -203,7 +203,7 @@ class CouchDBLauncher(docker: StandaloneDockerClient, port: Int, dataDir: File)(
   private def createDbClient(dbName: String) =
     new NonEscapingClient(
       "http",
-      StandaloneDockerSupport.getLocalHostName(),
+      StandaloneDockerSupport.getRemoteHostName(),
       port,
       dbConfig.user,
       dbConfig.password,
@@ -212,7 +212,7 @@ class CouchDBLauncher(docker: StandaloneDockerClient, port: Int, dataDir: File)(
   private def updateConfig(): Unit = {
     //The config needs to pushed via system property and then the Typesafe ConfigFactory cache
     //should be purged such that config gets read again and hence read these system properties
-    setp("host", StandaloneDockerSupport.getLocalHostName())
+    setp("host", StandaloneDockerSupport.getRemoteHostName())
     setp("port", port.toString)
     setp("password", dbConfig.password)
     setp("username", dbConfig.user)
