@@ -46,6 +46,7 @@ import KafkaLauncher._
 
 class Conf(arguments: Seq[String]) extends ScallopConf(Conf.expandAllMode(arguments)) {
   import StandaloneOpenWhisk.preferredPgPort
+  import StandaloneOpenWhisk.preferredWebPort
   banner(StandaloneOpenWhisk.banner)
   footer("\nOpenWhisk standalone server")
   StandaloneOpenWhisk.gitInfo.foreach(g => version(s"Git Commit - ${g.commitId}"))
@@ -122,6 +123,16 @@ class Conf(arguments: Seq[String]) extends ScallopConf(Conf.expandAllMode(argume
         "By default bootstrap is done by default when using Memory store or default CouchDB support. " +
         "When using other stores enable this flag to get bootstrap done",
     noshort = true)
+
+  val webPath = opt[String](
+    descr = "Path to the static web content")
+
+  val webPort = opt[Int](
+    descr =
+      s"Web port to serve static content. If not specified then $preferredWebPort" +
+      s" or some random free port (if $preferredWebPort is busy) would be used",
+    noshort = true,
+    required = false)
 
   mainOptions = Seq(manifest, configFile, apiGw, couchdb, userEvents, kafka, kafkaUi)
 
@@ -207,6 +218,7 @@ object StandaloneOpenWhisk extends SLF4JLogging {
   val wskPath = System.getProperty("whisk.standalone.wsk", "wsk")
 
   val preferredPgPort = 3232
+  val preferredWebPort = 3231
 
   private val systemUser = "whisk.system"
 
@@ -250,7 +262,11 @@ object StandaloneOpenWhisk extends SLF4JLogging {
     val pgLauncher = if (conf.noUi()) None else Some(createPgLauncher(owPort, conf))
     val pgSvc = pgLauncher.map(pg => Seq(pg.run())).getOrElse(Seq.empty)
 
-    val svcs = Seq(defaultSvcs, apiGwSvcs, couchSvcs.toList, kafkaSvcs, userEventSvcs, pgSvc).flatten
+
+    val webLauncher = if (conf.webPath.isEmpty) None else Some(createWebLocalLauncher(conf.webPath(), conf))
+    val webSvc = webLauncher.map(web => Seq(web.run())).getOrElse(Seq.empty)
+
+    val svcs = Seq(defaultSvcs, apiGwSvcs, couchSvcs.toList, kafkaSvcs, userEventSvcs, pgSvc, webSvc).flatten
     new ServiceInfoLogger(conf, svcs, dataDir).run()
 
     startServer(conf)
@@ -562,6 +578,13 @@ object StandaloneOpenWhisk extends SLF4JLogging {
     setSysProp("whisk.docker.standalone.container-factory.pull-standard-images", "false")
   }
 
+  private def createWebLocalLauncher(
+    webPath: String,
+    conf: Conf)(implicit logging: Logging, as: ActorSystem, ec: ExecutionContext, materializer: ActorMaterializer) = {
+    implicit val tid: TransactionId = TransactionId(systemPrefix + "web-local")
+    val port = getPort(conf.webPort.toOption, preferredWebPort)
+    new WebLocalLauncher(webPath, port)
+  }
   private def createPgLauncher(
     owPort: Int,
     conf: Conf)(implicit logging: Logging, as: ActorSystem, ec: ExecutionContext, materializer: ActorMaterializer) = {
