@@ -34,8 +34,7 @@ class WebLocalLauncher(webPath: String, webPort: Int)(implicit logging: Logging,
                                              tid: TransactionId) {
   private val interface = loadConfigOrThrow[String]("whisk.controller.interface")
 
-  private val web = "web-local"
-  private val webUrl = s"http://${StandaloneDockerSupport.getLocalHostName()}:$webPort/$web"
+  private val webUrl = s"http://${StandaloneDockerSupport.getLocalHostName()}:$webPort/"
 
   def run(): ServiceContainer = {
     BasicHttpService.startHttpService(WebLocalService.route, webPort, None, interface)(actorSystem, materializer)
